@@ -24,10 +24,15 @@ import (
 	listers "k8s.io/client-go/listers/core/v1"
 )
 
+// TCPPortMapper is capable of retrieving a TCP port mapping for a given service.
+type TCPPortMapper interface {
+	Find(svc k8s.ServiceWithPort) (int32, bool)
+}
+
 // Provider holds a client to access the provider.
 type Provider struct {
 	defaultMode          string
-	tcpStateTable        *k8s.State
+	tcpStateTable        TCPPortMapper
 	ignored              k8s.IgnoreWrapper
 	serviceLister        listers.ServiceLister
 	endpointsLister      listers.EndpointsLister
@@ -49,7 +54,7 @@ type destinationKey struct {
 func (p *Provider) Init() {}
 
 // New creates a new provider.
-func New(defaultMode string, tcpStateTable *k8s.State, ignored k8s.IgnoreWrapper,
+func New(defaultMode string, tcpStateTable TCPPortMapper, ignored k8s.IgnoreWrapper,
 	serviceLister listers.ServiceLister,
 	endpointsLister listers.EndpointsLister,
 	podLister listers.PodLister,
@@ -150,7 +155,16 @@ func (p *Provider) BuildConfig() (*dynamic.Configuration, error) {
 
 						p.buildTrafficSplit(config, trafficSplit, sp, id, groupedTrafficTarget, whitelistMiddleware, scheme)
 					case k8s.ServiceTypeTCP:
-						meshPort := p.getMeshPort(service.Name, service.Namespace, sp.Port)
+						meshPort, ok := p.tcpStateTable.Find(k8s.ServiceWithPort{
+							Namespace: service.Namespace,
+							Name:      service.Name,
+							Port:      sp.Port,
+						})
+						if !ok {
+							log.Debugf("Mesh TCP port not found for service %s/%s %d", service.Namespace, service.Name, sp.Port)
+							continue
+						}
+
 						config.TCP.Routers[key] = p.buildTCPRouterFromTrafficTarget(groupedTrafficTarget, meshPort, key)
 						config.TCP.Services[key] = p.buildTCPServiceFromTrafficTarget(base.GetEndpointsFromList(service.Name, service.Namespace, endpoints), groupedTrafficTarget)
 					}
@@ -350,7 +364,7 @@ func (p *Provider) buildHTTPRouterFromTrafficTarget(serviceName, serviceNamespac
 	}
 }
 
-func (p *Provider) buildTCPRouterFromTrafficTarget(trafficTarget *access.TrafficTarget, port int, key string) *dynamic.TCPRouter {
+func (p *Provider) buildTCPRouterFromTrafficTarget(trafficTarget *access.TrafficTarget, port int32, key string) *dynamic.TCPRouter {
 	var rule string
 
 	for _, spec := range trafficTarget.Specs {
@@ -532,20 +546,6 @@ func (p *Provider) buildTrafficSplit(config *dynamic.Configuration, trafficSplit
 	weightedKey := buildKey(svc.Name, svc.Namespace, sp.Port, trafficTarget.Name, trafficTarget.Namespace)
 	config.HTTP.Routers[weightedKey] = p.buildHTTPRouterFromTrafficTarget(trafficSplit.Spec.Service, trafficSplit.Namespace, svc.Spec.ClusterIP, trafficTarget, 5000+id, weightedKey, whitelistMiddleware)
 	config.HTTP.Services[weightedKey] = svcWeighted
-}
-
-func (p *Provider) getMeshPort(serviceName, serviceNamespace string, servicePort int32) int {
-	if p.tcpStateTable == nil {
-		return 0
-	}
-
-	for port, v := range p.tcpStateTable.Table {
-		if v.Name == serviceName && v.Namespace == serviceNamespace && v.Port == servicePort {
-			return port
-		}
-	}
-
-	return 0
 }
 
 func buildKey(serviceName, namespace string, port int32, ttName, ttNamespace string) string {

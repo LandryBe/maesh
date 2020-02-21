@@ -1,9 +1,8 @@
-package tcpportmapping
+package k8s
 
 import (
 	"testing"
 
-	"github.com/containous/maesh/pkg/k8s"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -20,7 +19,7 @@ func TestTCPPortMapping_GetEmptyState(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(cfgMap)
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, k8s.ResyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, ResyncPeriod)
 	err := informerFactory.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cfgMap)
 	require.NoError(t, err)
 	lister := informerFactory.Core().V1().ConfigMaps().Lister()
@@ -45,7 +44,7 @@ func TestTCPPortMapping_GetWithState(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(cfgMap)
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, k8s.ResyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, ResyncPeriod)
 	err := informerFactory.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cfgMap)
 	require.NoError(t, err)
 
@@ -77,7 +76,7 @@ func TestTCPPortMapping_AddWithState(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(cfgMap)
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, k8s.ResyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, ResyncPeriod)
 	err := informerFactory.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cfgMap)
 	require.NoError(t, err)
 
@@ -113,7 +112,7 @@ func TestTCPPortMapping_AddOverflow(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(cfgMap)
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, k8s.ResyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, ResyncPeriod)
 	err := informerFactory.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cfgMap)
 	require.NoError(t, err)
 
@@ -166,7 +165,7 @@ func TestTCPPortMapping_FindWithState(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(cfgMap)
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, k8s.ResyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, ResyncPeriod)
 	err := informerFactory.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cfgMap)
 	require.NoError(t, err)
 

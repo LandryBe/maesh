@@ -17,10 +17,15 @@ import (
 	listers "k8s.io/client-go/listers/core/v1"
 )
 
+// TCPPortMapper is capable of retrieving a TCP port mapping for a given service.
+type TCPPortMapper interface {
+	Find(svc k8s.ServiceWithPort) (int32, bool)
+}
+
 // Provider holds a client to access the provider.
 type Provider struct {
 	defaultMode     string
-	tcpStateTable   *k8s.State
+	tcpStateTable   TCPPortMapper
 	ignored         k8s.IgnoreWrapper
 	serviceLister   listers.ServiceLister
 	endpointsLister listers.EndpointsLister
@@ -32,7 +37,7 @@ func (p *Provider) Init() {
 }
 
 // New creates a new provider.
-func New(defaultMode string, tcpStateTable *k8s.State, ignored k8s.IgnoreWrapper, serviceLister listers.ServiceLister, endpointsLister listers.EndpointsLister) *Provider {
+func New(defaultMode string, tcpStateTable TCPPortMapper, ignored k8s.IgnoreWrapper, serviceLister listers.ServiceLister, endpointsLister listers.EndpointsLister) *Provider {
 	p := &Provider{
 		defaultMode:     defaultMode,
 		tcpStateTable:   tcpStateTable,
@@ -63,7 +68,7 @@ func (p *Provider) buildRouter(name, namespace, ip string, port int, serviceName
 	}
 }
 
-func (p *Provider) buildTCPRouter(port int, serviceName string) *dynamic.TCPRouter {
+func (p *Provider) buildTCPRouter(port int32, serviceName string) *dynamic.TCPRouter {
 	return &dynamic.TCPRouter{
 		Rule:        "HostSNI(`*`)",
 		EntryPoints: []string{fmt.Sprintf("tcp-%d", port)},
@@ -164,7 +169,15 @@ func (p *Provider) BuildConfig() (*dynamic.Configuration, error) {
 				continue
 			}
 
-			meshPort := p.getMeshPort(service.Name, service.Namespace, sp.Port)
+			meshPort, ok := p.tcpStateTable.Find(k8s.ServiceWithPort{
+				Namespace: service.Namespace,
+				Name:      service.Name,
+				Port:      sp.Port,
+			})
+			if !ok {
+				log.Debugf("Mesh TCP port not found for service %s/%s %d", service.Namespace, service.Name, sp.Port)
+				continue
+			}
 			config.TCP.Routers[key] = p.buildTCPRouter(meshPort, key)
 			config.TCP.Services[key] = p.buildTCPService(base.GetEndpointsFromList(service.Name, service.Namespace, endpoints))
 		}
@@ -240,20 +253,6 @@ func buildRateLimitMiddleware(annotations map[string]string) *dynamic.RateLimit 
 	}
 
 	return nil
-}
-
-func (p *Provider) getMeshPort(serviceName, serviceNamespace string, servicePort int32) int {
-	if p.tcpStateTable == nil {
-		return 0
-	}
-
-	for port, v := range p.tcpStateTable.Table {
-		if v.Name == serviceName && v.Namespace == serviceNamespace && v.Port == servicePort {
-			return port
-		}
-	}
-
-	return 0
 }
 
 func buildKey(name, namespace string, port int32) string {

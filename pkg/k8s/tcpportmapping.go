@@ -1,4 +1,4 @@
-package tcpportmapping
+package k8s
 
 import (
 	"errors"
@@ -15,25 +15,16 @@ import (
 
 /**
 TODO:
-- Cleanup the client for unnecessary functions
-- Find a better name for this package
 - Integrate this in the controller
 - Make sure int32 is not too constraining once integrated
 */
 
-// ServiceWithPort holds a combination of service name, namespace and port.
-type ServiceWithPort struct {
-	Namespace string
-	Name      string
-	Port      int32
-}
-
-// TCPPortMapper is capable of storing and retrieving a TCP port mapping for a given service.
-type TCPPortMapper interface {
-	Find(svc ServiceWithPort) (int32, bool)
-	Get(srcPort int32) *ServiceWithPort
-	Add(svc *ServiceWithPort) (int32, error)
-}
+/**
+Controller integration:
+- Call loadState if the state is not yet loaded before doing anything in Find, Get, Add:
+	-> Ugly
+	-> Might trigger errors which can't be intercepted unless changing their prototypes.
+*/
 
 // TCPPortMapping is a TCPPortMapper backed by a Kubernetes ConfigMap.
 type TCPPortMapping struct {

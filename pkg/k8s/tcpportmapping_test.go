@@ -22,6 +22,7 @@ func TestTCPPortMapping_GetEmptyState(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, ResyncPeriod)
 	err := informerFactory.Core().V1().ConfigMaps().Informer().GetIndexer().Add(cfgMap)
 	require.NoError(t, err)
+
 	lister := informerFactory.Core().V1().ConfigMaps().Lister()
 
 	m, err := NewTCPPortMapping(client, lister, "maesh", "tcp-state-table", 10000, 10200)
@@ -118,7 +119,8 @@ func TestTCPPortMapping_AddOverflow(t *testing.T) {
 
 	lister := informerFactory.Core().V1().ConfigMaps().Lister()
 
-	m, err := NewTCPPortMapping(client, lister, "maesh", "tcp-state-table", 10000, 10001)
+	var m *TCPPortMapping
+	m, err = NewTCPPortMapping(client, lister, "maesh", "tcp-state-table", 10000, 10001)
 	require.NoError(t, err)
 
 	wantSvc := &ServiceWithPort{
@@ -126,7 +128,9 @@ func TestTCPPortMapping_AddOverflow(t *testing.T) {
 		Name:      "my-app",
 		Port:      9090,
 	}
-	port, err := m.Add(wantSvc)
+
+	var port int32
+	port, err = m.Add(wantSvc)
 	require.NoError(t, err)
 	assert.Equal(t, int32(10000), port)
 
@@ -134,7 +138,7 @@ func TestTCPPortMapping_AddOverflow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(10001), port)
 
-	port, err = m.Add(wantSvc)
+	_, err = m.Add(wantSvc)
 	assert.Error(t, err)
 
 	gotSvc := m.Get(10000)
@@ -214,13 +218,6 @@ func TestParseServiceNamePort(t *testing.T) {
 			given:         "foo/bar:80",
 			wantName:      "bar",
 			wantNamespace: "foo",
-			wantPort:      80,
-		},
-		{
-			desc:          "empty namespace",
-			given:         "bar:80",
-			wantName:      "bar",
-			wantNamespace: "default",
 			wantPort:      80,
 		},
 		{

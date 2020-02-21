@@ -178,6 +178,7 @@ func (p *Provider) BuildConfig() (*dynamic.Configuration, error) {
 				log.Debugf("Mesh TCP port not found for service %s/%s %d", service.Namespace, service.Name, sp.Port)
 				continue
 			}
+
 			config.TCP.Routers[key] = p.buildTCPRouter(meshPort, key)
 			config.TCP.Services[key] = p.buildTCPService(base.GetEndpointsFromList(service.Name, service.Namespace, endpoints))
 		}

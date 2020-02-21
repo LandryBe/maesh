@@ -7,24 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/retry"
 )
-
-/**
-TODO:
-- Integrate this in the controller
-- Make sure int32 is not too constraining once integrated
-*/
-
-/**
-Controller integration:
-- Call loadState if the state is not yet loaded before doing anything in Find, Get, Add:
-	-> Ugly
-	-> Might trigger errors which can't be intercepted unless changing their prototypes.
-*/
 
 // TCPPortMapping is a TCPPortMapper backed by a Kubernetes ConfigMap.
 type TCPPortMapping struct {
@@ -69,6 +55,7 @@ func (m *TCPPortMapping) Find(svc ServiceWithPort) (int32, bool) {
 			return port, true
 		}
 	}
+
 	return 0, false
 }
 
@@ -162,8 +149,8 @@ func (m *TCPPortMapping) saveState() error {
 
 func parseServiceNamePort(value string) (*ServiceWithPort, error) {
 	service := strings.Split(value, ":")
-	if len(service) < 2 {
-		return nil, fmt.Errorf("could not parse service into name and port")
+	if len(service) != 2 {
+		return nil, fmt.Errorf("unable to parse service into name and port")
 	}
 
 	port64, err := strconv.ParseInt(service[1], 10, 32)
@@ -173,13 +160,8 @@ func parseServiceNamePort(value string) (*ServiceWithPort, error) {
 
 	substring := strings.Split(service[0], "/")
 
-	// TODO: Remove this if we can't have such pattern in the configMap.
-	if len(substring) == 1 {
-		return &ServiceWithPort{
-			Name:      substring[0],
-			Namespace: metav1.NamespaceDefault,
-			Port:      int32(port64),
-		}, nil
+	if len(substring) != 2 {
+		return nil, errors.New("unable to parse service into namespace and name")
 	}
 
 	return &ServiceWithPort{

@@ -82,6 +82,8 @@ func New(defaultMode string, tcpStateTable TCPPortMapper, ignored k8s.IgnoreWrap
 
 // BuildConfig builds the configuration for routing
 // from a native kubernetes environment.
+// FIXME: Reduce cognitive complexity.
+// nolint:gocognit
 func (p *Provider) BuildConfig() (*dynamic.Configuration, error) {
 	config := base.CreateBaseConfigWithReadiness()
 	base.AddBaseSMIMiddlewares(config)

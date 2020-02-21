@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containous/maesh/pkg/providers/base"
-
 	"github.com/containous/maesh/pkg/k8s"
+	"github.com/containous/maesh/pkg/providers/base"
 	"github.com/containous/traefik/v2/pkg/config/dynamic"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -14,6 +13,12 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+type tcpMappingPortMock func(svc k8s.ServiceWithPort) (int32, bool)
+
+func (t tcpMappingPortMock) Find(svc k8s.ServiceWithPort) (int32, bool) {
+	return t(svc)
+}
 
 func TestBuildRouter(t *testing.T) {
 	expectedWithMiddlewares := &dynamic.Router{
@@ -71,16 +76,6 @@ func TestBuildTCPRouter(t *testing.T) {
 }
 
 func TestBuildConfiguration(t *testing.T) {
-	stateTable := &k8s.State{
-		Table: map[int]*k8s.ServiceWithPort{
-			10000: {
-				Name:      "test",
-				Namespace: "foo",
-				Port:      80,
-			},
-		},
-	}
-
 	testCases := []struct {
 		desc           string
 		mockFile       string
@@ -272,7 +267,22 @@ func TestBuildConfiguration(t *testing.T) {
 
 			clientMock := k8s.NewClientMock(ctx.Done(), test.mockFile, false)
 			ignored := k8s.NewIgnored()
-			provider := New(k8s.ServiceTypeHTTP, stateTable, ignored, clientMock.ServiceLister, clientMock.EndpointsLister)
+
+			findTCPPort := func(svc k8s.ServiceWithPort) (int32, bool) {
+				service := k8s.ServiceWithPort{
+					Namespace: "foo",
+					Name:      "test",
+					Port:      80,
+				}
+
+				if service == svc {
+					return 10000, true
+				}
+
+				return 0, false
+			}
+
+			provider := New(k8s.ServiceTypeHTTP, tcpMappingPortMock(findTCPPort), ignored, clientMock.ServiceLister, clientMock.EndpointsLister)
 			config, err := provider.BuildConfig()
 			assert.NoError(t, err)
 
@@ -395,16 +405,6 @@ func TestBuildService(t *testing.T) {
 }
 
 func TestBuildTCPService(t *testing.T) {
-	stateTable := &k8s.State{
-		Table: map[int]*k8s.ServiceWithPort{
-			10000: {
-				Name:      "test",
-				Namespace: "foo",
-				Port:      80,
-			},
-		},
-	}
-
 	testCases := []struct {
 		desc      string
 		mockFile  string
@@ -462,7 +462,22 @@ func TestBuildTCPService(t *testing.T) {
 
 			clientMock := k8s.NewClientMock(ctx.Done(), test.mockFile, false)
 			ignored := k8s.NewIgnored()
-			provider := New(k8s.ServiceTypeHTTP, stateTable, ignored, clientMock.ServiceLister, clientMock.EndpointsLister)
+
+			findTCPPort := func(svc k8s.ServiceWithPort) (int32, bool) {
+				service := k8s.ServiceWithPort{
+					Namespace: "foo",
+					Name:      "test",
+					Port:      80,
+				}
+
+				if service == svc {
+					return 10000, true
+				}
+
+				return 0, false
+			}
+
+			provider := New(k8s.ServiceTypeHTTP, tcpMappingPortMock(findTCPPort), ignored, clientMock.ServiceLister, clientMock.EndpointsLister)
 			actual := provider.buildTCPService(test.endpoints)
 			assert.Equal(t, test.expected, actual)
 		})

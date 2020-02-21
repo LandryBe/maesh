@@ -336,7 +336,7 @@ func TestBuildHTTPRouterFromTrafficTarget(t *testing.T) {
 func TestBuildTCPRouterFromTrafficTarget(t *testing.T) {
 	testCases := []struct {
 		desc          string
-		port          int
+		port          int32
 		key           string
 		trafficTarget *accessv1alpha1.TrafficTarget
 		expected      *dynamic.TCPRouter

@@ -101,14 +101,14 @@ func NewMeshController(clients *k8s.ClientWrapper, smiEnabled bool, defaultMode 
 		apiPort:           apiPort,
 	}
 
-	if err := c.Init(); err != nil {
+	if err := c.init(); err != nil {
 		log.Errorln("Could not initialize MeshController")
 	}
 
 	return c
 }
 
-func (c *Controller) Init() error {
+func (c *Controller) init() error {
 	// Register handler funcs to controller funcs.
 	c.handler.RegisterMeshHandlers(c.createMeshService, c.updateMeshService, c.deleteMeshService)
 
@@ -286,7 +286,7 @@ func (c *Controller) createMeshServices() error {
 			continue
 		}
 		// We're expecting an IsNotFound error here, to only create the maesh service if it does not exist.
-		if err != nil && !errors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return fmt.Errorf("unable to check if maesh service exists: %w", err)
 		}
 
@@ -322,12 +322,16 @@ func (c *Controller) createMeshService(service *corev1.Service) error {
 			}
 
 			targetPort := intstr.FromInt(5000 + id)
+
 			if serviceMode == k8s.ServiceTypeTCP {
-				port, err := c.getTCPPort(service.Name, service.Namespace, sp.Port)
+				var port int32
+
+				port, err = c.getTCPPort(service.Name, service.Namespace, sp.Port)
 				if err != nil {
 					log.Errorf("Unable to find available TCP port, skipping port %s on service %s/%s", sp.Name, service.Namespace, service.Name)
 					continue
 				}
+
 				targetPort = intstr.FromInt(int(port))
 			}
 
@@ -408,7 +412,8 @@ func (c *Controller) updateMeshService(oldUserService *corev1.Service, newUserSe
 
 			targetPort := intstr.FromInt(5000 + id)
 			if serviceMode == k8s.ServiceTypeTCP {
-				port, err := c.getTCPPort(newUserService.Name, newUserService.Namespace, sp.Port)
+				var port int32
+				port, err = c.getTCPPort(newUserService.Name, newUserService.Namespace, sp.Port)
 				if err != nil {
 					log.Warnf("Unable to find available TCP port, skipping port %s on service %s/%s", sp.Name, newUserService.Namespace, newUserService.Name)
 					continue
@@ -468,6 +473,7 @@ func (c *Controller) getTCPPort(serviceName, serviceNamespace string, servicePor
 	}
 
 	log.Debugf("Service %s/%s %d as been assigned port %d", serviceName, serviceNamespace, servicePort, port)
+
 	return port, nil
 }
 
